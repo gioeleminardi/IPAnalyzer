@@ -9,7 +9,15 @@ import (
 	"github.com/tatsushid/go-fastping"
 	"net"
 	"time"
+	"os/signal"
+	"syscall"
+	"sort"
 )
+
+type response struct {
+	addr *net.IPAddr
+	rtt  time.Duration
+}
 
 func main() {
 
@@ -21,24 +29,66 @@ func main() {
 	}
 
 	p := fastping.NewPinger()
+	results := make(map[string]*response)
 	for _, v := range ipList {
 		ra, err := net.ResolveIPAddr("ip4:icmp", v)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+		results[ra.String()] = nil
 		p.AddIPAddr(ra)
 	}
-	p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-		fmt.Printf("IP Addr: %s receive, RTT: %v\n", addr.String(), rtt)
+
+	onRecv, onIdle := make(chan *response), make(chan bool)
+	p.OnRecv = func(addr *net.IPAddr, t time.Duration) {
+		onRecv <- &response{addr: addr, rtt: t}
 	}
 	p.OnIdle = func() {
-		fmt.Println("finish")
+		onIdle <- true
 	}
-	err = p.Run()
-	if err != nil {
-		fmt.Println(err)
+	p.MaxRTT = 10*time.Second
+
+	p.RunLoop()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+
+	var keys []string
+loop:
+	for {
+		select {
+		case <- c:
+			fmt.Println("get interrupted")
+			break loop
+		case res := <- onRecv:
+			if _, ok := results[res.addr.String()]; ok {
+				results[res.addr.String()] = res
+			}
+		case <- onIdle:
+			for k := range results {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				if results[k] == nil {
+					fmt.Printf("%s: unreacheable\n", k)
+				} else {
+					fmt.Printf("%s: %v\n", k, results[k].rtt)
+				}
+				results[k] = nil
+			}
+		case <- p.Done():
+			if err := p.Err(); err != nil {
+				fmt.Println("ping failed: ", err)
+			}
+			break loop
+		}
 	}
+	signal.Stop(c)
+	p.Stop()
+
 }
 
 func parseIPRange(ipRangeArg string) (ipList []string, err error) {
