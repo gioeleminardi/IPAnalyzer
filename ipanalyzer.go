@@ -118,8 +118,7 @@ loop:
 				results[res.addr.String()] = res
 			}
 		case <- onIdle:
-			//CallClear()
-			fmt.Printf("\033[0;0H")
+			CallClear()
 			for k := range results {
 				keys = append(keys, k)
 			}
@@ -128,7 +127,7 @@ loop:
 				if results[k] == nil {
 					fmt.Printf("%s: %s\n", k, green("[free]"))
 				} else {
-					fmt.Printf("%s: %s\n", k, red("[taken]"))
+					fmt.Printf("%s: %s %v\n", k, red("[taken]"), results[k].rtt)
 				}
 				results[k] = nil
 			}
