@@ -6,7 +6,6 @@ import (
 	"strings"
 	"errors"
 	"strconv"
-	"github.com/tatsushid/go-fastping"
 	"net"
 	"time"
 	"os/signal"
@@ -14,6 +13,10 @@ import (
 	"sort"
 	"flag"
 	"os/user"
+	"os/exec"
+	"runtime"
+	"github.com/fatih/color"
+	"github.com/tatsushid/go-fastping"
 )
 
 type response struct {
@@ -21,14 +24,38 @@ type response struct {
 	rtt  time.Duration
 }
 
+var clear map[string]func()
+
+func init() {
+	clear = make(map[string]func())
+	clear["linux"] = func() {
+		cmd := exec.Command("clear")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+	clear["darwin"] = func() {
+		cmd := exec.Command("clear")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+	clear["windows"] = func() {
+		cmd := exec.Command("cls")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+}
+
 func main() {
+	CallClear()
+
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
 
 	user, err := user.Current()
 	if user.Username != "root" {
 		fmt.Println("Need root permissions. Abort")
 		os.Exit(1)
 	}
-
 
 	var maxTime time.Duration
 	flag.DurationVar(&maxTime, "t", 1000000000, "set the time interval from one ping to another (specify unit like ns, ms, s)")
@@ -91,15 +118,17 @@ loop:
 				results[res.addr.String()] = res
 			}
 		case <- onIdle:
+			//CallClear()
+			fmt.Printf("\033[0;0H")
 			for k := range results {
 				keys = append(keys, k)
 			}
 			sort.Strings(keys)
 			for _, k := range keys {
 				if results[k] == nil {
-					fmt.Printf("%s: unreacheable\n", k)
+					fmt.Printf("%s: %s\n", k, green("[free]"))
 				} else {
-					fmt.Printf("%s: %v\n", k, results[k].rtt)
+					fmt.Printf("%s: %s\n", k, red("[taken]"))
 				}
 				results[k] = nil
 			}
@@ -156,4 +185,13 @@ func parseIPRange(ipRangeArg string) (ipList []string, err error) {
 	//fmt.Printf("ipList: %q", ipList)
 
 	return ipList, nil
+}
+
+func CallClear() {
+	value, ok := clear[runtime.GOOS] //runtime.GOOS -> linux, windows, darwin etc.
+	if ok { //if we defined a clear func for that platform:
+		value()  //we execute it
+	} else { //unsupported platform
+		panic("Your platform is unsupported! I can't clear terminal screen :(")
+	}
 }
