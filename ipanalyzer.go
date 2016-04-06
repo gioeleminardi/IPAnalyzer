@@ -12,6 +12,8 @@ import (
 	"os/signal"
 	"syscall"
 	"sort"
+	"flag"
+	"os/user"
 )
 
 type response struct {
@@ -21,7 +23,29 @@ type response struct {
 
 func main() {
 
-	ipList, err := parseIPRange(os.Args[1])
+	user, err := user.Current()
+	if user.Username != "root" {
+		fmt.Println("Need root permissions. Abort")
+		os.Exit(1)
+	}
+
+
+	var maxTime time.Duration
+	flag.DurationVar(&maxTime, "t", 1000000000, "set the time interval from one ping to another (specify unit like ns, ms, s)")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage:\n  %s [options] hostname\n\nOptions:\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	ipRange := flag.Arg(0)
+	if len(ipRange) == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	ipList, err := parseIPRange(ipRange)
 
 	if err != nil {
 		fmt.Println(err)
@@ -47,7 +71,7 @@ func main() {
 	p.OnIdle = func() {
 		onIdle <- true
 	}
-	p.MaxRTT = 10*time.Second
+	p.MaxRTT = maxTime
 
 	p.RunLoop()
 
@@ -79,6 +103,7 @@ loop:
 				}
 				results[k] = nil
 			}
+			keys = nil
 		case <- p.Done():
 			if err := p.Err(); err != nil {
 				fmt.Println("ping failed: ", err)
