@@ -178,11 +178,6 @@ func parseIPRange(ipRangeArg string) (ipList []string, err error) {
 		ipList = append(ipList, strings.Join(singleAddr, "."))
 	}
 
-	//fmt.Printf("%s\n", netAddrStr)
-	//fmt.Printf("initialHost: %d\n", initialHost)
-	//fmt.Printf("finalHost: %d\n", finalHost)
-	//fmt.Printf("ipList: %q", ipList)
-
 	return ipList, nil
 }
 
