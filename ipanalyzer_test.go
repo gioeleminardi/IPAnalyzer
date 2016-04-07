@@ -1,8 +1,6 @@
 package main
 
-import (
-	"testing"
-)
+import "testing"
 
 // Test if the function recognize 192.168.0.1-255 notation
 func TestParseIPDash(t *testing.T) {
