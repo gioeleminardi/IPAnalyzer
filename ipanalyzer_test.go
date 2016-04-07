@@ -27,5 +27,4 @@ func TestParseIPDash(t *testing.T) {
 	if (ipList[0] != "192.168.0.1" || ipList[1] != "192.168.0.2") {
 		t.Fatalf("parseIPDash func not works")
 	}
-
 }
